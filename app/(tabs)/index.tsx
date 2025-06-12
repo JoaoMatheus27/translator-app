@@ -13,10 +13,32 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import Logo from "../assets/images/Logo.png"; // seu logo
 import { icons } from "../constants/icons"; // seus ícones
 import TranslateInput from "../components/TranslateInput";
+import { useNavigation } from '@react-navigation/native';
+import { TouchableOpacity } from "react-native";
 
 const MICROSOFT_TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
 const MICROSOFT_TRANSLATOR_KEY = "CT10kJTAtkFj46u3vLOvRIv3bqGAGpzOUMusrSH5gfG3rkoGiexrJQQJ99BFACZoyfiXJ3w3AAAbACOGX73e";
 const MICROSOFT_TRANSLATOR_REGION = "brazilsouth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
+
+// Salvar uma tradução
+const saveTranslation = async (original: string, translated: string) => {
+  const history = await AsyncStorage.getItem('@translation_history');
+  const newHistory = history ? JSON.parse(history) : [];
+  
+  // Limitar o histórico aos últimos 50 itens
+  const updatedHistory = [...newHistory, { original, translated, date: new Date().toISOString() }].slice(-50);
+  
+  await AsyncStorage.setItem('@translation_history', JSON.stringify(updatedHistory));
+};
+
+// Recuperar histórico
+const loadHistory = async () => {
+  const history = await AsyncStorage.getItem('@translation_history');
+  return history ? JSON.parse(history) : [];
+};
 
 // Função para chamar a API do Microsoft Translator
 const callTranslationApi = async (
@@ -71,6 +93,7 @@ export default function TranslationScreen() {
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState("pt");
+  const navigation = useNavigation();
 
   const languages = [
     { label: "Português (Brasil)", value: "pt" },
@@ -97,6 +120,7 @@ export default function TranslationScreen() {
     const result = await callTranslationApi(text, lang);
     if (result) {
       setTranslatedText(result);
+      await saveTranslation(text, result);
     }
     setLoading(false);
   };
@@ -113,7 +137,14 @@ export default function TranslationScreen() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.logoContainer}>
+          
           <Image style={styles.logo} source={Logo} />
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('History' as never)}
+            style={styles.saveButton}
+          >
+            <Image source={icons.save} style={styles.saveIcon} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.mainContentContainer}>
@@ -215,5 +246,15 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "90deg" }],
     marginVertical: 4,
     tintColor: "#666",
+  },
+  saveButton: {
+    position: 'absolute',
+    right: 20,
+    top: 100,
+  },
+  saveIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#333',
   },
 });
